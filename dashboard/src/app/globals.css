@@ -1,0 +1,26 @@
+:root { --violet: #4c1d95; --violet-d: #2e1065; --gold: #d4a017; --bg: #f6f3fb; --card: #fff; --text: #1f1b2e; --muted: #6b6580; --red: #b91c1c; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', Tahoma, 'Noto Naskh Arabic', Arial, sans-serif; }
+button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; padding: 8px 14px; background: var(--violet); color: #fff; }
+button.gold { background: var(--gold); color: var(--violet-d); font-weight: 700; }
+button.ghost { background: transparent; color: var(--red); border: 1px solid var(--red); }
+button:disabled { opacity: .5; cursor: default; }
+input { font: inherit; padding: 10px 12px; border: 1px solid #cfc7e6; border-radius: 10px; width: 100%; }
+nav { background: var(--violet-d); color: #fff; display: flex; gap: 16px; align-items: center; padding: 12px 20px; }
+nav b { color: var(--gold); margin-inline-end: auto; }
+nav a { color: #fff; text-decoration: none; } nav button { background: #ffffff22; }
+main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.col h2 { margin: 0 0 10px; color: var(--violet); }
+.card { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 4px #0001; border-inline-start: 5px solid var(--gold); }
+.card.late { border-inline-start-color: var(--red); }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.muted { color: var(--muted); font-size: .9rem; } .err { color: var(--red); }
+.box { max-width: 380px; margin: 12vh auto; background: var(--card); padding: 24px; border-radius: 16px; display: grid; gap: 12px; }
+
+/* phones: stack nav and forms instead of squeezing them */
+nav { flex-wrap: wrap; }
+@media (max-width: 640px) {
+  main { padding: 12px; }
+  form.card > div.addrow, form.card > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+}

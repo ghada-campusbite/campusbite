@@ -1,0 +1,88 @@
+# Place this folder next to campusbite-backend/ and campusbite-dashboard/
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campusbite
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+      POSTGRES_DB: campusbite
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campusbite"]
+      interval: 5s
+      retries: 10
+    logging: *logging
+
+  migrate:   # one-shot owner-role migration; the api service never runs migrations
+    build: ../campusbite-backend
+    command: ["sh","-c","DATABASE_URL=$$MIGRATE_DATABASE_URL npx prisma migrate deploy"]
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      MIGRATE_DATABASE_URL: postgresql://campusbite:${DB_PASSWORD}@db:5432/campusbite
+    restart: "no"
+
+  api:
+    build: ../campusbite-backend
+    restart: unless-stopped
+    depends_on: { db: { condition: service_healthy }, migrate: { condition: service_completed_successfully } }
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      TRUST_PROXY_HOPS: 1   # Caddy is the only proxy in front of the API
+      DATABASE_URL: postgresql://campusbite:${DB_PASSWORD}@db:5432/campusbite
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY:?set RESEND_API_KEY}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}   # optional, only if you enable push security in your Expo account
+      CORS_ORIGINS: ""   # dashboard calls the API server-side and the mobile app has no CORS, so none needed
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      retries: 5
+      start_period: 30s
+    logging: *logging
+
+  dashboard:
+    build: ../campusbite-dashboard
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      API_URL: http://api:3000/api/v1
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [api, dashboard]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    entrypoint: ["sh", "/backup.sh"]
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

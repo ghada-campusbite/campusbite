@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  CANTEEN_STAFF
+  ADMIN
+}
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model University {
+  id       String       @id @default(uuid())
+  name     String
+  canteens Canteen[]
+  breaks   ClassBreak[]
+  campuses Campus[]
+}
+
+// A university can have several campuses; a canteen optionally belongs to one.
+model Campus {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University @relation(fields: [universityId], references: [id])
+  name         String
+  canteens     Canteen[]
+  users        User[]
+  @@index([universityId])
+}
+
+// Minutes since midnight, Africa/Cairo time
+model ClassBreak {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University @relation(fields: [universityId], references: [id])
+  startMin     Int
+  endMin       Int
+  @@index([universityId])
+}
+
+model Canteen {
+  id               String     @id @default(uuid())
+  name             String
+  universityId     String
+  university       University @relation(fields: [universityId], references: [id])
+  campusId         String?
+  campus           Campus?    @relation(fields: [campusId], references: [id])
+  prepMinutes      Int        @default(10)
+  // opening hours, minutes since midnight Africa/Cairo (null = always open)
+  openMin          Int?
+  closeMin         Int?
+  // max active orders accepted per pickup slot
+  maxOrdersPerSlot Int        @default(10)
+  active           Boolean    @default(true)
+  items            MenuItem[]
+  orders           Order[]
+  staff            User[]
+  @@index([campusId])
+}
+
+model User {
+  id               String  @id @default(uuid())
+  email            String  @unique
+  name             String
+  passwordHash     String
+  role             Role    @default(STUDENT)
+  canteenId        String?
+  canteen          Canteen? @relation(fields: [canteenId], references: [id])
+  refreshTokenHash String?
+  emailVerifiedAt  DateTime?
+  suspendedAt      DateTime?
+  campusId         String?
+  campus           Campus? @relation(fields: [campusId], references: [id])
+  orders           Order[]
+  devices          PushDevice[]
+  emailTokens      EmailToken[]
+  createdAt        DateTime @default(now())
+}
+
+model MenuItem {
+  id         String  @id @default(uuid())
+  canteenId  String
+  canteen    Canteen @relation(fields: [canteenId], references: [id])
+  name        String
+  description String  @default("")
+  category    String  @default("")
+  imageUrl    String?
+  priceCents  Int
+  // optional discounted price; must be lower than priceCents. Orders charge this when set.
+  offerPriceCents Int?
+  available   Boolean @default(true)
+  archived    Boolean @default(false)
+  orderItems  OrderItem[]
+  image       MenuItemImage?
+  @@index([canteenId])
+}
+
+// Image bytes live in the database so free-tier hosts with ephemeral
+// filesystems (e.g. Render free) don't lose menu photos on restart.
+model MenuItemImage {
+  itemId String   @id
+  item   MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  data   Bytes
+  mime   String
+}
+
+model Order {
+  id         String      @id @default(uuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id])
+  canteenId  String
+  canteen    Canteen     @relation(fields: [canteenId], references: [id])
+  status     OrderStatus @default(PENDING)
+  // STUDENT or STAFF when status = CANCELLED
+  cancelledBy String?
+  totalCents Int
+  pickupAt   DateTime
+  // 4-digit code shown to the student; staff must type it to mark the order COMPLETED.
+  // Stored AES-256-GCM encrypted (see src/orders/pickup-code.ts), never plaintext.
+  pickupCodeEnc String   @default("")
+  // wrong-code attempts: 5 misses lock code entry on this order for 10 minutes
+  codeAttempts    Int       @default(0)
+  codeLockedUntil DateTime?
+  items      OrderItem[]
+  createdAt  DateTime    @default(now())
+  @@index([userId])
+  @@index([canteenId, status])
+}
+
+model OrderItem {
+  id             String   @id @default(uuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId     String
+  menuItem       MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity       Int
+  unitPriceCents Int
+}
+
+model PushDevice {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+enum EmailTokenType {
+  VERIFY
+  RESET
+}
+
+// one active 6-digit code per user+type; only a keyed hash of the code is stored
+model EmailToken {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      EmailTokenType
+  codeHash  String
+  attempts  Int            @default(0)
+  expiresAt DateTime
+  createdAt DateTime       @default(now())
+  @@unique([userId, type])
+}
+
+// Platform-wide settings (key/value). commissionPercent defaults to 0 when unset.
+model PlatformSetting {
+  key   String @id
+  value String
+}

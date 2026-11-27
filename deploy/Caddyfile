@@ -1,0 +1,13 @@
+{
+	email {$ACME_EMAIL}
+}
+
+api.{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:3000
+}
+
+panel.{$DOMAIN} {
+	encode gzip
+	reverse_proxy dashboard:3001
+}

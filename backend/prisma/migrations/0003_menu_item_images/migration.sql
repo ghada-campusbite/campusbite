@@ -1,0 +1,5 @@
+CREATE TABLE "MenuItemImage" (
+  "itemId" TEXT PRIMARY KEY REFERENCES "MenuItem"("id") ON DELETE CASCADE,
+  "data" BYTEA NOT NULL,
+  "mime" TEXT NOT NULL
+);
