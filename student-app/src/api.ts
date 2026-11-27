@@ -8,7 +8,8 @@ export const store = Platform.OS === 'web' ? {
   deleteItemAsync: async (k: string) => { globalThis.localStorage?.removeItem(k); },
 } : SecureStore;
 
-const BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? (globalThis as any).__CB_API_URL ?? '';
+const DEFAULT_API = 'https://campusbite-api-s86z.onrender.com/api/v1';
+const BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? (globalThis as any).__CB_API_URL ?? DEFAULT_API;
 // menu images are served from /menu/:id/image on the same server
 export const ORIGIN = BASE.replace(/\/api\/v1\/?$/, '');
 // fail fast: release builds must never send passwords over plain http

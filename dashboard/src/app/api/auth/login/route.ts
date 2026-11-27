@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   }
   const r = await fetch(`${API}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json', ...fwdHeaders(req) },
-    body: JSON.stringify({ email: body.email, password: body.password }), cache: 'no-store',
+    body: JSON.stringify({ email: body.email.trim(), password: body.password }), cache: 'no-store',
   });
   if (r.status === 429) return NextResponse.json({ message: 'محاولات كتير، جرّب بعد دقيقة' }, { status: 429 });
   if (r.status === 403) return NextResponse.json({ message: 'الحساب ده موقوف' }, { status: 403 });

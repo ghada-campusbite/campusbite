@@ -19,7 +19,7 @@ export default function Login() {
     if (signup && name.trim().length < 2) return setErr('اكتب اسمك');
     if (signup && password.length < 10) return setErr('الباسورد لازم 10 حروف على الأقل');
     setBusy(true);
-    try { signup ? await register(name, email, password) : await signIn(email, password); }
+    try { signup ? await register(name, email.trim(), password) : await signIn(email.trim(), password); }
     catch (e: any) { setErr(e.message); }
     finally { setBusy(false); }
   }
